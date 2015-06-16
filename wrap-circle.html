@@ -1,0 +1,255 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf8">
+		<title>离散点最小包围圆</title>
+	</head>
+	<body>
+		<style>
+			canvas {
+				width: 500px;
+				height: 500px;
+				background: #EEEEEE;
+			}
+#result {
+			position: fixed;
+			width: 150px;
+			top: 0;
+			right: 0;
+}
+		</style>
+		<canvas id="canvas" width="500" height="500"></canvas>
+		<div id="result"></div>
+		<script>
+			var canvas = document.getElementById("canvas");
+			var result = document.getElementById("result");
+
+			var points = [
+				//{x:100, y:100},
+				//{x:400, y:100}
+			];
+
+			canvas.onmousedown = function (e) {
+				var o = {
+					x: e.layerX,
+					y: e.layerY
+				};
+				if (points.length >= 3) {
+				//	points.pop();
+				}
+				points.push(o);
+
+				refreshDrawing();
+			};
+
+			canvas.onmousemove = function (e) {
+				result.innerHTML = "X: " + e.layerX + ", Y: " + e.layerY;
+			};
+
+			function refreshDrawing() {
+				var pack = getBorderPackage(points);
+				var size = 3;
+				var c2d = canvas.getContext("2d");
+				c2d.beginPath();
+				c2d.clearRect(0, 0, canvas.width, canvas.height);
+				c2d.lineWidth = 1;
+
+				for (var i = 0; i < points.length; i++) {
+					c2d.beginPath();
+					if (!points[i].border) {
+						c2d.strokeStyle = "#FF0000";
+					} else {
+						c2d.strokeStyle = "#0000FF";
+					}
+					c2d.moveTo(points[i].x + size, points[i].y);
+					c2d.ellipse(points[i].x, points[i].y, size, size, 0, 0, Math.PI * 2, true);
+					c2d.stroke();
+				}
+
+				c2d.beginPath();
+				var c = getCircle(points);
+				c2d.moveTo(c.p.x + c.r, c.p.y);
+				c2d.ellipse(c.p.x, c.p.y, c.r, c.r, 0, 0, Math.PI * 2, false);
+				c2d.strokeStyle = "#000000";
+				c2d.stroke();
+
+				c2d.beginPath();
+				c2d.moveTo(c.p.x + size, c.p.y);
+				c2d.ellipse(c.p.x, c.p.y, size, size, 0, 0, Math.PI * 2, true);
+				c2d.fillStyle = "#0000FF";
+				c2d.fill();
+
+				c2d.beginPath();
+				c2d.strokeStyle="#7777FF";
+				c2d.moveTo(points[pack[pack.length - 1]].x, points[pack[pack.length - 1]].y);
+				for (var i = 0; i < pack.length; i++) {
+					c2d.lineTo(points[pack[i]].x, points[pack[i]].y);
+				}
+				c2d.stroke();
+			}
+
+			function center(p1, p2) {
+				return {x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2};
+			}
+			function dist(p1, p2) {
+				return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+			}
+			function isOxygon(p1, p2, p3) {
+				var s1 = dist(p1, p2), s2 = dist(p2, p3), s3 = dist(p1, p3);
+				if (s1*s1 + s2*s2 > s3*s3 && s1*s1 + s3*s3 > s2*s2 && s1*s1 < s2*s2 + s3*s3) {
+					return true;
+				}
+				return false;
+			}
+			function maxLine(p1, p2, p3) {
+				var d12 = dist(p1, p2);
+				var d13 = dist(p1, p3);
+				var d23 = dist(p2, p3);
+
+				if (d23 > d12 && d23 > d13) {
+					return {
+						p: center(p2, p3),
+						r: dist(p2, p3) / 2
+					};
+				} else if (d12 > d23 && d12 > d13) {
+					return {
+						p: center(p1, p2),
+						r: dist(p1, p2) / 2
+					};
+				} else {
+					return {
+						p: center(p1, p3),
+						r: dist(p1, p3) / 2
+					};
+				}
+			}
+			function outer(p1, p2, p3) {
+				var k1 = (p2.y - p1.y) / (p2.x - p1.x);
+				var k2 = (p3.y - p1.y) / (p3.x - p1.x);
+				if (k1 == k2) {
+					return maxLine(p1, p2, p3);
+				}
+
+				var m1 = center(p1, p2);
+				var m2 = center(p1, p3);
+				var k1v = -1 / k1;
+				var k2v = -1 / k2;
+				var x, y;
+
+
+				if (k1v == 0) {
+					y = m1.y;
+					x = (m1.y - m2.y) / k2v + m2.x;
+				} else if (k2v == 0) {
+					y = m2.y;
+					x = (m2.y - m1.y) / k1v + m1.x;
+				}
+				if (k1 == 0) {
+					x = m1.x;
+					y = (m1.x - m2.x) * k2v + m2.y;
+				} else if (k2 == 0) {
+					x = m2.x;
+					y = (m2.x - m1.x) * k1v + m1.y;
+				}
+
+				//y - y1 = k1 (x - x1)
+				//y - y2 = k2 (x - x2)
+
+
+				if (x === undefined) {
+					x = (m2.y - m1.y - k2v*m2.x + k1v*m1.x) / (k1v - k2v);
+					y = m1.y + k1v * (x - m1.x);
+				}
+				
+				var po = {x: x, y: y};
+				return {
+					p: po,
+					r: dist(po, p1)
+				};
+
+			}
+			function checkCircle(circle, p) {
+				for (var ci = 0; ci < p.length; ci++) {
+					if (dist(circle.p, p[ci]) - circle.r > 0.00000001) {
+						return false;
+					}
+				}
+				return true;
+			}
+			function getCircle(p) {
+				if (p.length <= 1) {
+					return { p: p[0], r: 0 };
+				} else if (p.length == 2) {
+					return { p: center(p[0], p[1]), r: dist(p[0], p[1])/2 };
+				} else {
+					var bp = null;
+					var bpp = getBorderPackage(p).map(function (e) {
+						return p[e];
+					});
+					for (var i = 0; i < bpp.length; i++) {
+						for (var j = i+1; j < bpp.length; j++) {
+							for (var k = j+1; k < bpp.length; k++) {
+								var cp;
+								if (isOxygon(bpp[i], bpp[j], bpp[k])) {
+									cp = outer(bpp[i], bpp[j], bpp[k]);
+								} else {
+									cp = maxLine(bpp[i], bpp[j], bpp[k]);
+								}
+								if (checkCircle(cp, bpp)) {
+									if (bp == null) {
+										bp = cp;
+									} else if (bp.r > cp.r) {
+										bp = cp;
+									}
+								}
+							}
+						}
+					}
+					return bp;
+				}
+			}
+			function cross(p1, p2, p3) {
+				return (p3.x - p1.x) * (p1.y - p2.y) - (p3.y - p1.y) * (p1.x - p2.x);
+			}
+			function getBorderPackage(p) {
+				var leftest = 0;
+				var list = [];
+				for (var i = 0; i < p.length; i++) {
+					p[i].border = false;
+					if (p[i].x < p[leftest].x) {
+						leftest = i;
+					} else if (p[i].x == p[leftest].x && p[i].y < p[leftest].y) {
+						leftest = i;
+					}
+				}
+				var inside = leftest;
+				p[leftest].border = true;
+				while (true) {
+					var not = -1;
+					for (var i = 0; i < p.length; i++) {
+						if (!p[i].border) { //找一个不在凸包上的点
+							not = i;
+							break;
+						}
+					}
+					if (not == -1) break;
+					for (var i = 0; i < p.length; i++) {
+						var cr = cross(p[inside], p[i], p[not]);
+						if ((cr > 0) || (cr == 0) && (dist(p[inside], p[i]) > dist(p[inside], p[not]))) {
+							not = i;
+						}
+					}
+					if (p[not].border) {
+						break;
+					}
+					list.push(not);
+					p[not].border = true;
+					inside = not;
+				}
+				list.push(leftest);
+				return list;
+			}
+
+		</script>
+	</body>
+</html>
